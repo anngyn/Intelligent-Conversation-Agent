@@ -1,0 +1,15 @@
+# Copy this file to terraform.tfvars and customize values
+
+aws_region   = "us-east-1"
+environment  = "dev"
+project_name = "agentic-system"
+vpc_cidr     = "10.0.0.0/16"
+
+# Set these during deployment
+# backend_image  = "123456789.dkr.ecr.us-east-1.amazonaws.com/agentic-backend:latest"
+# frontend_image = "123456789.dkr.ecr.us-east-1.amazonaws.com/agentic-frontend:latest"
+
+# Fargate configuration
+task_cpu       = "256"   # 0.25 vCPU
+task_memory    = "512"   # 0.5 GB
+desired_count  = 1

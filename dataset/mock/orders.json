@@ -1,0 +1,43 @@
+[
+  {
+    "full_name": "John Smith",
+    "last4_ssn": "1234",
+    "date_of_birth": "1990-01-15",
+    "order_id": "ORD-98765",
+    "status": "Shipped",
+    "tracking_number": "1Z999AA10123456784",
+    "estimated_delivery": "2026-04-22",
+    "items": ["Laptop Stand", "Wireless Mouse"]
+  },
+  {
+    "full_name": "Jane Doe",
+    "last4_ssn": "5678",
+    "date_of_birth": "1985-06-20",
+    "order_id": "ORD-54321",
+    "status": "Delivered",
+    "tracking_number": "1Z999AA10987654321",
+    "estimated_delivery": "2026-04-15",
+    "delivery_date": "2026-04-14",
+    "items": ["USB-C Hub", "HDMI Cable"]
+  },
+  {
+    "full_name": "Michael Johnson",
+    "last4_ssn": "9012",
+    "date_of_birth": "1992-11-03",
+    "order_id": "ORD-11223",
+    "status": "Processing",
+    "tracking_number": null,
+    "estimated_ship_date": "2026-04-20",
+    "items": ["Keyboard", "Mouse Pad", "Wrist Rest"]
+  },
+  {
+    "full_name": "Emily Chen",
+    "last4_ssn": "3456",
+    "date_of_birth": "1988-03-12",
+    "order_id": "ORD-77889",
+    "status": "Out for Delivery",
+    "tracking_number": "1Z999AA10555555555",
+    "estimated_delivery": "2026-04-19",
+    "items": ["Office Chair"]
+  }
+]
