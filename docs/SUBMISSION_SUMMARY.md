@@ -1,193 +1,178 @@
-# Cloud Kinetics Assignment - Submission Summary
+# Technical Document
 
-**Candidate**: `Nguyen An`  
-**Date**: April 22, 2026  
-**Position**: SA AI/Data Intern
+**Project**: Agentic Conversational System  
+**Assignment**: Cloud Kinetics SA AI/Data Intern Assignment  
+**Candidate**: `<fill before submission>`  
+**Repository**: `<fill before submission>`  
+**Demo Video**: `<fill before submission>`  
+**Date**: April 22, 2026
 
-## Executive Summary
+## 1. Solution Overview
 
-This submission delivers:
+This solution handles two e-commerce support workflows:
+- grounded Q&A over company documents
+- secure order status lookup with identity verification
+
+System includes:
+- Streamlit frontend
+- FastAPI backend with streaming responses
+- AWS Bedrock for model inference and embeddings
+- FAISS for current vector retrieval
+- DynamoDB for conversation history
+- PostgreSQL for customer and order operational data
+- Terraform for AWS deployment
+- CloudWatch for logs, metrics, dashboard, and alarms
+
+Implemented scope covers:
 - Level 100 core agent capability
 - Level 200 AWS deployment and CI/CD
-- Level 300 baseline for data persistence and observability
+- Level 300 baseline for persistence and observability
 
-System solves two business flows:
-- grounded document Q&A through RAG
-- secure order status lookup through identity-verified tool use
+## 2. Architecture
 
-## What Was Built
+### Runtime flow
+`User -> ALB -> frontend ECS service -> backend ECS service -> Bedrock`
 
-### 1. Grounded document Q&A
-- Amazon 10-K processed into FAISS vector index
-- Bedrock Titan Embed v2 for embeddings
-- Bedrock Claude 3 Haiku for reasoning and answer generation
-- retrieved context used to ground answers and reduce hallucination
+### Data split by access pattern
 
-### 2. Secure order lookup workflow
-- multi-turn identity verification
-- requires full name, last 4 SSN digits, and date of birth before order lookup
-- tool path validates identity fields before returning order information
+| Data type | Store | Reason |
+|---|---|---|
+| Conversation history | DynamoDB | Session-based append and ordered read |
+| Customer and order operations | PostgreSQL | Relational integrity and indexed lookup |
+| Vector retrieval corpus | FAISS | Small corpus and lowest cost floor |
 
-### 3. Conversation memory
+### Architecture diagram
+
+![AWS Architecture](architect.png)
+
+## 3. Design Decisions
+
+### DynamoDB for conversation history
+
+Conversation history has simple access pattern:
+- append by session
+- replay ordered messages by session
+- expire old sessions automatically
+
+Chosen structure:
+- partition key: `session_id`
+- sort key: ordered message key
+- attributes: role, content, metadata, ttl
+
+Why not PostgreSQL:
+- higher operational overhead for this workload
+- weaker fit for session-based append/replay
+
+### PostgreSQL for customer and order operations
+
+Customer and order data is operational business data. It benefits from:
+- relational structure
+- indexing
+- integrity constraints
+
+Chosen model:
+- `customers`
+- `orders`
+- `order_items`
+
+Why not DynamoDB:
+- business relationships and indexed operational lookup matter here
+
+### FAISS now, OpenSearch later
+
+FAISS is current implementation because corpus is still small.
+
+Why FAISS now:
+- simple
+- cheap
+- enough for assignment scale
+
+Why OpenSearch later:
+- good managed vector option
+- cost floor too high for current scope
+- should be introduced only when corpus size, filtering, or concurrency justify it
+
+### ECS Fargate for deployment
+
+ECS Fargate chosen because application has:
+- always-on frontend/backend runtime
+- streaming behavior
+- clear container boundaries
+
+This is simpler than forcing same shape into Lambda.
+
+## 4. Implementation Details
+
+### Frontend
+- Streamlit chat UI
+- sends chat requests to backend
+- renders streaming responses
+
+### Backend
+- FastAPI API layer
+- LangChain-based agent orchestration
+- retrieval tool for document Q&A
+- order lookup tool for operational workflow
+- session-aware conversation handling
+
+### Data persistence
 - conversation history persisted in DynamoDB
-- supports ordered session replay by `session_id`
-- suitable for multi-instance ECS runtime
+- order and customer operations stored in PostgreSQL
 
-### 4. Operational customer and order data
-- PostgreSQL-backed data model for customers, orders, and order items
-- relational structure used for integrity and indexed lookup
-- better fit than key-value storage for operational business data
+### Security
+- order lookup requires identity verification before returning operational data
+- logs redact PII
+- backend service remains private
+- IAM follows least-privilege model
 
-### 5. AWS deployment
-- Terraform-managed AWS infrastructure
-- ECS deployment split into frontend and backend services
-- ALB in front of frontend
-- private backend service
-- ECR repositories
-- CloudWatch monitoring
-
-### 6. Observability baseline
-- structured JSON logging
+### Observability baseline
+- structured JSON logs
 - PII redaction
 - EMF custom metrics
 - CloudWatch dashboard
 - CloudWatch alarms
 
-## Architecture Summary
+## 5. Validation and Trade-offs
 
-### Runtime flow
-`User -> ALB -> frontend ECS service -> backend ECS service -> Bedrock`
+### Validation
 
-### Storage split
+Validated locally:
+- backend persistence tests pass
+- order store tests pass
+- terraform configuration validates successfully
 
-| Data type | Store | Why |
-|---|---|---|
-| Conversation history | DynamoDB | Session-based append and ordered read |
-| Customer and order operations | PostgreSQL | Relational integrity and indexed lookup |
-| Vector retrieval corpus | FAISS | Small corpus, lowest cost floor |
+Validated artifacts:
+- README aligned to current architecture
+- architecture PNG included
+- docs aligned to current design decisions
 
-### Production-aware vector decision
-- current implementation: FAISS
-- optional next step: OpenSearch
-- reason not implemented now: cost floor too high for assignment-scale corpus
+Not fully validated yet in AWS:
+- full `terraform apply` smoke test in a real account
+- end-to-end GitHub Actions deployment run
 
-## Key Design Decisions
+### Trade-offs
 
-### DynamoDB for conversation history
-- structure matches chat access pattern directly
-- partition by session, ordered message retrieval
-- low idle cost
-- scales naturally with concurrent chat sessions
+Implemented now:
+- AWS-native persistence for chat history and operational data
+- AWS-native deployment path
+- practical observability baseline
+- cost-aware vector retrieval choice
 
-### PostgreSQL for customer and order operations
-- customer-to-order-to-item relationships are relational
-- identity verification benefits from normalized data and indexing
-- stronger fit than DynamoDB for operational records
+Not implemented now:
+- OpenSearch vector database
+- X-Ray tracing
+- LangSmith tracing
+- richer alert routing and evaluation pipeline
 
-### FAISS for vector retrieval
-- current corpus small
-- lowest cost
-- simplest implementation
-- clear migration path to OpenSearch if corpus size or filtering requirements grow
+Reason:
+- current scope favors clear architecture thinking and right-sized implementation over overbuilding
 
-### ECS Fargate for runtime
-- better fit for always-on streaming frontend/backend services than Lambda
-- simpler deployment story for this application shape
-
-## Level Coverage
-
-### Level 100
-- agent with tool use
-- RAG retrieval
-- conversation handling
-- streaming responses
-
-### Level 200
-- Terraform infrastructure
-- ECS deployment
-- CI/CD pipeline
-- AWS networking and IAM
-
-### Level 300 baseline
-- DynamoDB-backed conversation persistence
-- PostgreSQL-backed operational data
-- structured logs, metrics, dashboard, alarms
-
-## Validation Status
-
-### Verified locally
-- targeted backend tests pass
-- `terraform validate` passes
-
-### Verified artifacts
-- AWS architecture diagram updated
-- demo script updated
-- presentation guide updated
-
-### Not yet fully verified in AWS
-- full `terraform apply` smoke test in a real AWS account
-- GitHub Actions end-to-end deployment run
-
-## Cost and Scale Positioning
-
-Current design is intentionally right-sized:
-- managed AWS services where they clearly fit
-- FAISS where managed vector search would be premature
-- storage split by access pattern instead of forcing one database for all data
-
-Scale path:
+### Scalability path
 - DynamoDB scales conversation throughput
 - PostgreSQL scales operational data path
-- ECS scales frontend and backend horizontally
-- OpenSearch remains optional future step for larger retrieval workloads
+- ECS services scale frontend and backend horizontally
+- OpenSearch remains future step when retrieval workload grows beyond FAISS sweet spot
 
-## Security Positioning
+## 6. Closing
 
-- identity verification enforced before order lookup
-- PII redaction in logs
-- private backend service
-- IAM least privilege
-- explicit separation between retrieval data, session state, and operational customer/order data
-
-## Deliverables Included
-
-- source code
-- Terraform infrastructure
-- GitHub Actions workflows
-- technical documentation
-- architecture diagram
-- demo script
-- presentation guide
-
-## Final Submission Checklist
-
-- [x] Codebase updated to current architecture
-- [x] README updated to current architecture
-- [x] Submission summary updated to current architecture
-- [x] Design decision docs aligned with implementation
-- [x] Demo script aligned with implementation
-- [ ] Fill candidate name
-- [ ] Add repository link
-- [ ] Add demo video link
-- [ ] Run final demo recording
-- [ ] Optional: run one AWS deployment smoke test
-
-## Recommended Reviewer Message
-
-`Main architecture decision was to separate conversation state, operational business data, and retrieval data by access pattern, then keep current implementation cost-aware while preserving a clear path to production scale.`
-
-## Links To Use In Review
-
-- [README](/D:/An/Project/Assignment/README.md:1)
-- [Design Decisions](/D:/An/Project/Assignment/docs/DESIGN_DECISIONS.md:1)
-- [Data Design](/D:/An/Project/Assignment/docs/DATA_DESIGN.md:1)
-- [Observability Design](/D:/An/Project/Assignment/docs/OBSERVABILITY_DESIGN.md:1)
-- [Demo Script](/D:/An/Project/Assignment/docs/DEMO_SCRIPT.md:1)
-- [Presentation Guide](/D:/An/Project/Assignment/docs/PRESENTATION.md:1)
-- [AWS Architecture Diagram](/D:/An/Project/Assignment/docs/system-architecture-aws.drawio)
-
-## Submission Metadata
-
-**Candidate**: `<fill before submission>`  
-**Repository Link**: `<fill before submission>`  
-**Demo Video Link**: `<fill before submission>`
+Main architecture decision in this project was to separate conversation state, operational business data, and retrieval data by access pattern, then keep current implementation cost-aware while preserving a clear path to production scale.
