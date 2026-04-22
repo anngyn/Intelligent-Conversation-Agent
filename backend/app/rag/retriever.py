@@ -1,8 +1,15 @@
 """RAG retriever wrapper with formatted output."""
 
+import logging
+import time
+
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
+
+from app.observability import emit_metrics
+
+logger = logging.getLogger(__name__)
 
 
 class FormattedRetriever:
@@ -31,7 +38,26 @@ class FormattedRetriever:
         Returns:
             Formatted string with retrieved information and sources
         """
+        start_time = time.perf_counter()
         docs: list[Document] = self.retriever.invoke(query)
+        retrieval_latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+
+        logger.info(
+            "rag_retrieval_completed",
+            extra={
+                "query_length": len(query),
+                "documents_retrieved": len(docs),
+                "retrieval_time_ms": retrieval_latency_ms,
+            },
+        )
+        emit_metrics(
+            metrics=[
+                {"Name": "RAGRetrievalTime", "Unit": "Milliseconds", "Value": retrieval_latency_ms},
+                {"Name": "RAGDocumentsRetrieved", "Unit": "Count", "Value": len(docs)},
+            ],
+            dimensions={"Component": "FAISS"},
+            properties={"query_length": len(query)},
+        )
 
         if not docs:
             return "No relevant information found in the knowledge base."

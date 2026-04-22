@@ -35,7 +35,7 @@ def main():
     print(f"Saving index to: {output_path}")
     save_vector_store(vectorstore, output_path)
 
-    print("✓ Ingestion complete!")
+    print("Ingestion complete!")
 
 
 if __name__ == "__main__":

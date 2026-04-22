@@ -3,9 +3,9 @@ FROM python:3.11-slim as builder
 
 WORKDIR /build
 
-# Install uv for faster dependency installation
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e .
+COPY backend/pyproject.toml ./pyproject.toml
+COPY backend/app/ ./app/
+RUN pip install --no-cache-dir .
 
 FROM python:3.11-slim
 
@@ -15,11 +15,9 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
-COPY app/ ./app/
-
-# Copy FAISS index (built during image build)
-COPY ../dataset/processed/ ./dataset/processed/
+# Copy application code and vector index
+COPY backend/app/ ./app/
+COPY dataset/processed/ ./dataset/processed/
 
 # Expose port
 EXPOSE 8000

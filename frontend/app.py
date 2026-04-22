@@ -1,12 +1,16 @@
 """Streamlit chat interface for the conversational agent."""
 
 import json
+import os
 import uuid
 
 import httpx
 import streamlit as st
+from dotenv import load_dotenv
 
-BACKEND_URL = "http://localhost:8000/api"
+load_dotenv()
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080/api")
 
 
 def init_session():
@@ -15,18 +19,47 @@ def init_session():
         st.session_state.session_id = str(uuid.uuid4())
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "conversations" not in st.session_state:
+        st.session_state.conversations = {
+            st.session_state.session_id: {
+                "title": "New Conversation",
+                "messages": []
+            }
+        }
 
 
 def reset_conversation():
     """Reset conversation and create new session."""
     old_session_id = st.session_state.session_id
+
+    # Save current conversation
+    if st.session_state.messages:
+        first_msg = st.session_state.messages[0]["content"][:50]
+        st.session_state.conversations[old_session_id] = {
+            "title": first_msg,
+            "messages": st.session_state.messages.copy()
+        }
+
+    # Create new session
     st.session_state.session_id = str(uuid.uuid4())
     st.session_state.messages = []
+    st.session_state.conversations[st.session_state.session_id] = {
+        "title": "New Conversation",
+        "messages": []
+    }
 
     try:
         httpx.delete(f"{BACKEND_URL}/session/{old_session_id}", timeout=5.0)
     except Exception:
         pass
+
+
+def load_conversation(session_id: str):
+    """Load a previous conversation."""
+    if session_id in st.session_state.conversations:
+        st.session_state.session_id = session_id
+        st.session_state.messages = st.session_state.conversations[session_id]["messages"].copy()
+        st.rerun()
 
 
 def parse_sse_event(line: str) -> dict | None:
@@ -106,22 +139,42 @@ def main():
     init_session()
 
     with st.sidebar:
-        st.header("Session Info")
-        st.caption(f"Session ID: {st.session_state.session_id[:8]}...")
-
-        if st.button("🔄 New Conversation", use_container_width=True):
+        if st.button("➕ New Conversation", use_container_width=True):
             reset_conversation()
             st.rerun()
 
         st.divider()
 
+        st.subheader("Conversations")
+
+        # Show conversation list
+        for sess_id, conv in sorted(
+            st.session_state.conversations.items(),
+            key=lambda x: x[0],
+            reverse=True
+        ):
+            is_current = sess_id == st.session_state.session_id
+            label = conv["title"]
+
+            if is_current:
+                st.markdown(f"**▶ {label}**")
+            else:
+                if st.button(
+                    label,
+                    key=f"load_{sess_id}",
+                    use_container_width=True,
+                    type="secondary"
+                ):
+                    load_conversation(sess_id)
+
+        st.divider()
+
         st.markdown("""
         ### What I can help with:
-        - **Company Information**: Ask about the company's financials, business, or strategy
-        - **Order Status**: Check your order shipment status (requires verification)
+        - **Company Information**: Ask about financials, business, strategy
+        - **Order Status**: Check shipment (requires verification)
 
         ### For order status:
-        I'll need to verify your identity with:
         - Full name
         - Last 4 digits of SSN
         - Date of birth
@@ -142,15 +195,29 @@ def main():
 
             try:
                 import asyncio
-                for chunk in asyncio.run(stream_chat(prompt)):
-                    if chunk:
-                        full_response += chunk
-                        message_placeholder.markdown(full_response + "▌")
 
+                async def run_stream():
+                    chunks = []
+                    async for chunk in stream_chat(prompt):
+                        if chunk:
+                            chunks.append(chunk)
+                            full = "".join(chunks)
+                            message_placeholder.markdown(full + "▌")
+                    return "".join(chunks)
+
+                full_response = asyncio.run(run_stream())
                 message_placeholder.markdown(full_response)
                 st.session_state.messages.append(
                     {"role": "assistant", "content": full_response}
                 )
+
+                # Update conversation title from first message
+                if len(st.session_state.messages) == 2:
+                    first_user_msg = st.session_state.messages[0]["content"][:50]
+                    st.session_state.conversations[st.session_state.session_id]["title"] = first_user_msg
+
+                # Save messages to conversation
+                st.session_state.conversations[st.session_state.session_id]["messages"] = st.session_state.messages.copy()
 
             except Exception as e:
                 error_msg = f"Failed to connect to backend: {str(e)}"

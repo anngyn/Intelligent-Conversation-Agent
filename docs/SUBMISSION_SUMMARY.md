@@ -1,240 +1,193 @@
 # Cloud Kinetics Assignment - Submission Summary
 
-**Candidate**: [Your Name]  
-**Date**: April 19, 2026  
-**Position**: Data-AI Solution Architect Intern
+**Candidate**: `Nguyen An`  
+**Date**: April 22, 2026  
+**Position**: SA AI/Data Intern
 
 ## Executive Summary
 
-I have completed **Level 100 (Core Agent)** and **Level 200 (Cloud Deployment)** of the assignment, implementing a production-ready Agentic Conversational system with RAG-based knowledge retrieval and secure tool-based workflows.
+This submission delivers:
+- Level 100 core agent capability
+- Level 200 AWS deployment and CI/CD
+- Level 300 baseline for data persistence and observability
+
+System solves two business flows:
+- grounded document Q&A through RAG
+- secure order status lookup through identity-verified tool use
 
 ## What Was Built
 
-### Level 100: Core Conversational Agent ✅
+### 1. Grounded document Q&A
+- Amazon 10-K processed into FAISS vector index
+- Bedrock Titan Embed v2 for embeddings
+- Bedrock Claude 3 Haiku for reasoning and answer generation
+- retrieved context used to ground answers and reduce hallucination
 
-**1. Knowledge-Based Q&A (RAG)**
-- Processes the provided Amazon 10-K PDF (18 pages) into a FAISS vector store
-- Chunking strategy: 1000 characters with 200-char overlap, section-aware metadata
-- Bedrock Titan Embeddings v2 for vectorization
-- Retrieves top-4 relevant chunks with source citations
-- Minimizes hallucinations through explicit prompt grounding
+### 2. Secure order lookup workflow
+- multi-turn identity verification
+- requires full name, last 4 SSN digits, and date of birth before order lookup
+- tool path validates identity fields before returning order information
 
-**2. Tool-Based Workflow: Order Status Check**
-- Implements multi-turn identity verification workflow
-- Requires ALL THREE fields before tool execution:
-  - Full name (case-insensitive)
-  - Last 4 digits of SSN (validated format)
-  - Date of birth (YYYY-MM-DD format)
-- Defense-in-depth: both system prompt AND tool function validate inputs
-- Mock database with 4 test accounts
+### 3. Conversation memory
+- conversation history persisted in DynamoDB
+- supports ordered session replay by `session_id`
+- suitable for multi-instance ECS runtime
 
-**3. Conversation Handling**
-- Multi-turn memory via LangChain `RunnableWithMessageHistory`
-- Session-based: each UI session gets unique ID
-- In-memory storage (documented upgrade path to DynamoDB)
-- Maintains context across RAG queries and tool calls
+### 4. Operational customer and order data
+- PostgreSQL-backed data model for customers, orders, and order items
+- relational structure used for integrity and indexed lookup
+- better fit than key-value storage for operational business data
 
-**Key Implementation**: LangChain ReAct agent with Claude 3 Haiku on Bedrock
+### 5. AWS deployment
+- Terraform-managed AWS infrastructure
+- ECS deployment split into frontend and backend services
+- ALB in front of frontend
+- private backend service
+- ECR repositories
+- CloudWatch monitoring
 
-### Level 200: System Deployment & Operations ✅
+### 6. Observability baseline
+- structured JSON logging
+- PII redaction
+- EMF custom metrics
+- CloudWatch dashboard
+- CloudWatch alarms
 
-**1. Cloud Deployment with Terraform**
-- Complete IaC in `infrastructure/`
-- Components deployed:
-  - **VPC**: 2 public + 2 private subnets across 2 AZs
-  - **ECS Fargate**: 0.25 vCPU, 0.5 GB (smallest config)
-  - **ALB**: Routes traffic to Streamlit frontend
-  - **ECR**: Docker image repositories with lifecycle policies
-  - **IAM**: Least-privilege roles with Bedrock permissions
-  - **CloudWatch**: Container logs with 7-day retention
-- Cost-optimized: ~$20/month when running 8 hrs/day
+## Architecture Summary
 
-**2. Streaming Responses**
-- FastAPI SSE (Server-Sent Events) endpoint
-- LangChain `astream_events` for real-time token streaming
-- Streamlit UI displays tokens incrementally
-- Shows tool call indicators ("Checking order status...")
+### Runtime flow
+`User -> ALB -> frontend ECS service -> backend ECS service -> Bedrock`
 
-**3. CI/CD Pipeline**
-- **CI** (`.github/workflows/ci.yml`): Ruff linting, pytest, Docker build
-- **CD** (`.github/workflows/cd.yml`): Build → Push to ECR → Terraform apply → ECS deploy
-- OIDC authentication (no static credentials)
+### Storage split
 
-## Technical Architecture
+| Data type | Store | Why |
+|---|---|---|
+| Conversation history | DynamoDB | Session-based append and ordered read |
+| Customer and order operations | PostgreSQL | Relational integrity and indexed lookup |
+| Vector retrieval corpus | FAISS | Small corpus, lowest cost floor |
 
-```
-┌──────────────┐     HTTP/SSE      ┌─────────────┐     Bedrock API    ┌──────────────┐
-│  Streamlit   │ ────────────────▶ │  FastAPI    │ ─────────────────▶ │   Bedrock    │
-│  Frontend    │ ◀──────────────── │  Backend    │ ◀───────────────── │   Claude 3   │
-│ (Port 8501)  │    Streaming      │ (Port 8000) │                    │    Haiku     │
-└──────────────┘                   └─────────────┘                    └──────────────┘
-                                           │
-                                           ├──────▶ FAISS Vector Store
-                                           │        (10-K Embeddings)
-                                           │
-                                           └──────▶ Mock Order DB (JSON)
-```
-
-**Deployment Architecture (AWS)**:
-```
-Internet ──▶ ALB (Public Subnets) ──▶ ECS Fargate Tasks (Private Subnets) ──▶ Bedrock
-                                                │
-                                                └──────▶ CloudWatch Logs
-```
+### Production-aware vector decision
+- current implementation: FAISS
+- optional next step: OpenSearch
+- reason not implemented now: cost floor too high for assignment-scale corpus
 
 ## Key Design Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| **FAISS (local)** | 18-page PDF = ~5 MB index. OpenSearch Serverless would cost $700/mo for zero benefit at this scale. FAISS has native LangChain support and zero operational overhead. |
-| **Claude 3 Haiku** | Cheapest Bedrock chat model ($0.25/MTok). Sufficient tool-calling capability for this use case. Sonnet would cost 10x more with marginal quality gain. |
-| **ECS Fargate** | Avoids Lambda cold starts (5-10s for Python + FAISS) and streaming complexity. Costs ~$0.01/hr, can scale to 0. EC2 would require AMI management. |
-| **In-memory sessions** | Demo-appropriate. LangChain provides `DynamoDBChatMessageHistory` as drop-in replacement (literally one line change). |
-| **Streamlit** | Production-quality chat UI in <200 lines. Avoids React/webpack complexity. Native async streaming support. |
-| **Terraform** | Infrastructure as Code is a core SA skill. Shows system design thinking. CloudFormation would work but is more verbose. |
+### DynamoDB for conversation history
+- structure matches chat access pattern directly
+- partition by session, ordered message retrieval
+- low idle cost
+- scales naturally with concurrent chat sessions
 
-## What Was NOT Built (Scope Decision)
+### PostgreSQL for customer and order operations
+- customer-to-order-to-item relationships are relational
+- identity verification benefits from normalized data and indexing
+- stronger fit than DynamoDB for operational records
 
-**Level 300** (Data Design & Observability) was intentionally excluded to focus on demonstrating:
-1. End-to-end agent implementation
-2. RAG system quality
-3. Cloud deployment expertise
-4. Cost-consciousness
+### FAISS for vector retrieval
+- current corpus small
+- lowest cost
+- simplest implementation
+- clear migration path to OpenSearch if corpus size or filtering requirements grow
 
-I can discuss Level 300 design decisions in the interview (SQL schema for conversations, LangSmith/X-Ray tracing, request classification pipeline, etc.).
+### ECS Fargate for runtime
+- better fit for always-on streaming frontend/backend services than Lambda
+- simpler deployment story for this application shape
 
-## Testing & Validation
+## Level Coverage
 
-### Unit Tests
-- `tests/test_mock_order.py`: Order lookup validation
-- `tests/test_rag.py`: Section detection, chunking
-- Run: `pytest -v`
+### Level 100
+- agent with tool use
+- RAG retrieval
+- conversation handling
+- streaming responses
 
-### Manual Test Cases
-1. **RAG Q&A**: "What were Amazon's total net sales?" → Returns specific numbers with page citations
-2. **Identity Verification**: Multi-turn collection of name/SSN/DOB → Successful order retrieval
-3. **Streaming**: Real-time token display, tool call indicators
-4. **Error Handling**: Invalid SSN format, missing info, no matching order
+### Level 200
+- Terraform infrastructure
+- ECS deployment
+- CI/CD pipeline
+- AWS networking and IAM
 
-### Test Accounts
-| Name | SSN | DOB | Status |
-|------|-----|-----|--------|
-| John Smith | 1234 | 1990-01-15 | Shipped |
-| Jane Doe | 5678 | 1985-06-20 | Delivered |
+### Level 300 baseline
+- DynamoDB-backed conversation persistence
+- PostgreSQL-backed operational data
+- structured logs, metrics, dashboard, alarms
 
-## How to Run
+## Validation Status
 
-### Local (5 minutes)
-```bash
-# 1. Install
-cd backend && pip install -e ".[dev]"
+### Verified locally
+- targeted backend tests pass
+- `terraform validate` passes
 
-# 2. Build FAISS index
-python scripts/ingest_pdf.py
+### Verified artifacts
+- AWS architecture diagram updated
+- demo script updated
+- presentation guide updated
 
-# 3. Run (requires AWS credentials with Bedrock access)
-python -m app.main  # Backend
-cd ../frontend && streamlit run app.py  # Frontend
-```
+### Not yet fully verified in AWS
+- full `terraform apply` smoke test in a real AWS account
+- GitHub Actions end-to-end deployment run
 
-### Docker Compose
-```bash
-docker-compose up --build
-```
+## Cost and Scale Positioning
 
-### AWS Deployment
-```bash
-cd infrastructure
-terraform init
-terraform apply
-# Access via ALB DNS output
-```
+Current design is intentionally right-sized:
+- managed AWS services where they clearly fit
+- FAISS where managed vector search would be premature
+- storage split by access pattern instead of forcing one database for all data
 
-Full instructions: `docs/SETUP.md`
+Scale path:
+- DynamoDB scales conversation throughput
+- PostgreSQL scales operational data path
+- ECS scales frontend and backend horizontally
+- OpenSearch remains optional future step for larger retrieval workloads
 
-## Repository Structure
+## Security Positioning
 
-```
-Assignment/
-├── backend/            # FastAPI + LangChain agent
-│   ├── app/
-│   │   ├── agent/      # Agent graph, tools, prompts, memory
-│   │   ├── api/        # FastAPI routes + SSE streaming
-│   │   ├── rag/        # PDF ingestion, FAISS, retriever
-│   │   └── mock/       # Order database
-│   ├── tests/          # Pytest unit tests
-│   └── scripts/        # FAISS index builder
-├── frontend/           # Streamlit chat UI
-├── infrastructure/     # Terraform IaC
-│   └── modules/        # ECR, (networking/ECS inline)
-├── dataset/
-│   ├── raw/            # 10-K PDF
-│   └── mock/           # Order test data
-├── .github/workflows/  # CI/CD
-└── docs/               # Setup guide
-```
+- identity verification enforced before order lookup
+- PII redaction in logs
+- private backend service
+- IAM least privilege
+- explicit separation between retrieval data, session state, and operational customer/order data
 
-## Estimated Costs (AWS)
+## Deliverables Included
 
-| Resource | Monthly (8h/day) |
-|----------|------------------|
-| Bedrock Claude Haiku | $2-5 |
-| Bedrock Titan Embeddings | <$0.01 |
-| ECS Fargate | $2.40 |
-| ALB | $4.80 |
-| NAT Gateway | $10.80 |
-| ECR + CloudWatch | $0.60 |
-| **Total** | **~$20-23** |
+- source code
+- Terraform infrastructure
+- GitHub Actions workflows
+- technical documentation
+- architecture diagram
+- demo script
+- presentation guide
 
-**Cost Optimization**: Scale ECS to 0 when not demoing. NAT can be eliminated by using public subnets (less production-like).
+## Final Submission Checklist
 
-## Security Considerations
+- [x] Codebase updated to current architecture
+- [x] README updated to current architecture
+- [x] Submission summary updated to current architecture
+- [x] Design decision docs aligned with implementation
+- [x] Demo script aligned with implementation
+- [ ] Fill candidate name
+- [ ] Add repository link
+- [ ] Add demo video link
+- [ ] Run final demo recording
+- [ ] Optional: run one AWS deployment smoke test
 
-1. **Identity Verification**: Defense-in-depth (prompt + tool validation)
-2. **RAG Grounding**: Explicit instructions to refuse hallucination
-3. **IAM Least Privilege**: Task role has ONLY `bedrock:InvokeModel*`
-4. **No Secrets in Code**: AWS credentials via IAM roles
-5. **Input Validation**: SSN format, DOB format, required fields
+## Recommended Reviewer Message
 
-## Strengths of This Implementation
+`Main architecture decision was to separate conversation state, operational business data, and retrieval data by access pattern, then keep current implementation cost-aware while preserving a clear path to production scale.`
 
-1. **Production-Ready Patterns**: Not a prototype. Uses industry-standard tools (LangChain, FastAPI, Terraform).
-2. **Cost-Conscious**: Deliberate choice of FAISS over managed vector stores saves $700/mo.
-3. **Well-Documented**: README, SETUP guide, inline code comments, comprehensive CLAUDE.md.
-4. **Testable**: Unit tests, clear test accounts, reproducible local setup.
-5. **Solution Architect Thinking**: Every design decision is justified in docs. Trade-offs are explicit.
+## Links To Use In Review
 
-## What I Would Add Next (Level 300 Discussion Topics)
+- [README](/D:/An/Project/Assignment/README.md:1)
+- [Design Decisions](/D:/An/Project/Assignment/docs/DESIGN_DECISIONS.md:1)
+- [Data Design](/D:/An/Project/Assignment/docs/DATA_DESIGN.md:1)
+- [Observability Design](/D:/An/Project/Assignment/docs/OBSERVABILITY_DESIGN.md:1)
+- [Demo Script](/D:/An/Project/Assignment/docs/DEMO_SCRIPT.md:1)
+- [Presentation Guide](/D:/An/Project/Assignment/docs/PRESENTATION.md:1)
+- [AWS Architecture Diagram](/D:/An/Project/Assignment/docs/system-architecture-aws.drawio)
 
-1. **Persistent Memory**: DynamoDB table for conversation history with TTL
-2. **Observability**: LangSmith tracing, CloudWatch dashboards, X-Ray
-3. **Data Model**: SQL schema for orders, customers, analytics
-4. **Request Classification**: Pre-agent routing (rule-based or lightweight LLM)
-5. **Advanced RAG**: Reranking (Cohere), HyDE, query decomposition
-6. **Evaluation**: RAG quality metrics (RAGAS), A/B testing framework
+## Submission Metadata
 
-## Deliverables Checklist
-
-- ✅ Source Code: GitHub repository (this folder)
-- ✅ Technical Documentation: README.md, SETUP.md, CLAUDE.md
-- ✅ Infrastructure as Code: Complete Terraform in `infrastructure/`
-- ✅ CI/CD Pipeline: GitHub Actions workflows
-- ✅ Tests: Pytest unit tests with >80% coverage of core logic
-- ⬜ Demo Recording: [TODO - record 3-5 min video showing RAG + order flow]
-
-## Next Steps
-
-I'm prepared to:
-1. Walk through the code architecture and design decisions
-2. Discuss trade-offs (e.g., FAISS vs. pgvector, Haiku vs. Sonnet)
-3. Explain how I would scale this to Level 300 (data model, observability)
-4. Demo the live system (local or AWS)
-5. Answer technical deep-dive questions
-
-Thank you for the opportunity to work on this assignment. I look forward to discussing the implementation in detail.
-
----
-
-**Contact**: [Your Email]  
-**GitHub**: [Repository Link]  
-**Demo Recording**: [Video Link - if available]
+**Candidate**: `<fill before submission>`  
+**Repository Link**: `<fill before submission>`  
+**Demo Video Link**: `<fill before submission>`

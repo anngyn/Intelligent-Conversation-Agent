@@ -13,3 +13,22 @@ vpc_cidr     = "10.0.0.0/16"
 task_cpu       = "256"   # 0.25 vCPU
 task_memory    = "512"   # 0.5 GB
 desired_count  = 1
+
+# Conversation history (DynamoDB)
+# conversation_table_name = "agentic-system-conversation-history"
+
+# Operational order/customer store (PostgreSQL)
+# order_database_name               = "agentic_system"
+# order_database_username           = "agent_app"
+order_database_instance_class      = "db.t4g.micro"
+order_database_allocated_storage   = 20
+order_database_max_allocated_storage = 100
+order_database_backup_retention_days = 7
+order_database_multi_az            = false
+order_database_skip_final_snapshot = true
+
+# Monitoring
+# alarm_notification_topic_arn       = "arn:aws:sns:us-east-1:123456789012:agentic-alerts"
+agent_latency_p99_threshold_ms       = 5000
+rag_retrieval_p95_threshold_ms       = 800
+order_store_latency_p95_threshold_ms = 250

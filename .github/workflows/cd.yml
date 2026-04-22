@@ -6,8 +6,9 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_BACKEND_REPO: agentic-backend
-  ECR_FRONTEND_REPO: agentic-frontend
+  PROJECT_NAME: agentic-system
+  ECR_BACKEND_REPO: agentic-system-backend
+  ECR_FRONTEND_REPO: agentic-system-frontend
 
 jobs:
   deploy:
@@ -25,6 +26,21 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        working-directory: ./infrastructure
+        run: terraform init
+
+      - name: Bootstrap ECR repositories
+        working-directory: ./infrastructure
+        env:
+          TF_VAR_project_name: ${{ env.PROJECT_NAME }}
+        run: terraform apply -auto-approve -target=module.ecr
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -34,7 +50,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG ./backend
+          docker build -f backend/Dockerfile -t $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG
           docker tag $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
           docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
@@ -49,26 +65,34 @@ jobs:
           docker tag $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
           docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.0
-
-      - name: Terraform Init
-        working-directory: ./infrastructure
-        run: terraform init
-
       - name: Terraform Apply
         working-directory: ./infrastructure
         env:
+          TF_VAR_project_name: ${{ env.PROJECT_NAME }}
           TF_VAR_backend_image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_BACKEND_REPO }}:${{ github.sha }}
           TF_VAR_frontend_image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_FRONTEND_REPO }}:${{ github.sha }}
         run: terraform apply -auto-approve
 
-      - name: Force ECS deployment
+      - name: Read Terraform outputs
+        id: tf
+        working-directory: ./infrastructure
+        run: |
+          echo "cluster_name=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_OUTPUT"
+          echo "backend_service_name=$(terraform output -raw backend_service_name)" >> "$GITHUB_OUTPUT"
+          echo "frontend_service_name=$(terraform output -raw frontend_service_name)" >> "$GITHUB_OUTPUT"
+
+      - name: Force backend ECS deployment
         run: |
           aws ecs update-service \
-            --cluster agentic-cluster \
-            --service agentic-service \
+            --cluster ${{ steps.tf.outputs.cluster_name }} \
+            --service ${{ steps.tf.outputs.backend_service_name }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Force frontend ECS deployment
+        run: |
+          aws ecs update-service \
+            --cluster ${{ steps.tf.outputs.cluster_name }} \
+            --service ${{ steps.tf.outputs.frontend_service_name }} \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}

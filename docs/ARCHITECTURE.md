@@ -2,369 +2,203 @@
 
 ## Overview
 
-The Agentic Conversational System is built on a three-tier architecture: frontend (Streamlit), backend (FastAPI + LangChain), and AI services (AWS Bedrock).
+System built around three concerns:
+- user interaction
+- agent runtime
+- data stores chosen by access pattern
 
-## Component Diagram
+Current implementation already includes Level 300 baseline for persistence and observability.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         User Layer                              │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │             Streamlit Chat Interface                     │  │
-│  │  - Session management (UUID-based)                       │  │
-│  │  - Real-time token streaming display                     │  │
-│  │  - Tool call indicators                                  │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└────────────────────────┬────────────────────────────────────────┘
-                         │ HTTP/SSE
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Application Layer                          │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                  FastAPI Backend                         │  │
-│  │                                                          │  │
-│  │  ┌─────────────────────────────────────────────────┐    │  │
-│  │  │  API Routes                                     │    │  │
-│  │  │  - POST /api/chat (SSE streaming)              │    │  │
-│  │  │  - GET /api/health                             │    │  │
-│  │  │  - DELETE /api/session/{id}                    │    │  │
-│  │  └─────────────────────────────────────────────────┘    │  │
-│  │                         │                                 │  │
-│  │                         ▼                                 │  │
-│  │  ┌─────────────────────────────────────────────────┐    │  │
-│  │  │         LangChain Agent Orchestration           │    │  │
-│  │  │                                                 │    │  │
-│  │  │  ┌──────────────────┐  ┌──────────────────┐   │    │  │
-│  │  │  │  Agent Graph     │  │   Memory Store   │   │    │  │
-│  │  │  │  (ReAct)         │  │  (ChatHistory)   │   │    │  │
-│  │  │  └──────────────────┘  └──────────────────┘   │    │  │
-│  │  │                                                 │    │  │
-│  │  │  ┌──────────────────┐  ┌──────────────────┐   │    │  │
-│  │  │  │   Tools          │  │  System Prompt   │   │    │  │
-│  │  │  │  - RAG Search    │  │  - Grounding     │   │    │  │
-│  │  │  │  - Order Check   │  │  - Verification  │   │    │  │
-│  │  │  └──────────────────┘  └──────────────────┘   │    │  │
-│  │  └─────────────────────────────────────────────────┘    │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└────────┬──────────────────────────┬─────────────────────────────┘
-         │                          │
-         ▼                          ▼
-┌──────────────────────┐   ┌───────────────────────────────────┐
-│    Data Layer        │   │       AI Services Layer           │
-│                      │   │                                   │
-│  ┌────────────────┐  │   │  ┌─────────────────────────────┐ │
-│  │  FAISS Index   │  │   │  │    AWS Bedrock              │ │
-│  │  - 10-K Chunks │  │   │  │                             │ │
-│  │  - Embeddings  │  │   │  │  ┌────────────────────────┐ │ │
-│  │  - Metadata    │  │   │  │  │ Claude 3 Haiku         │ │ │
-│  └────────────────┘  │   │  │  │ (Tool Calling)         │ │ │
-│                      │   │  │  └────────────────────────┘ │ │
-│  ┌────────────────┐  │   │  │                             │ │
-│  │  Mock Orders   │  │   │  │  ┌────────────────────────┐ │ │
-│  │  (JSON)        │  │   │  │  │ Titan Embeddings v2    │ │ │
-│  └────────────────┘  │   │  │  │ (Vectorization)        │ │ │
-│                      │   │  │  └────────────────────────┘ │ │
-└──────────────────────┘   │  └─────────────────────────────┘ │
-                           └───────────────────────────────────┘
-```
+## Runtime Topology
 
-## Request Flow
+### User-facing flow
+`User -> ALB -> frontend ECS service -> backend ECS service -> Bedrock`
 
-### RAG Query Flow
-```
-1. User: "What were Amazon's total net sales?"
-   ↓
-2. Streamlit → POST /api/chat with session_id
-   ↓
-3. FastAPI → LangChain Agent with message + chat_history
-   ↓
-4. Agent analyzes query → decides to use search_knowledge_base tool
-   ↓
-5. Tool invokes FAISS retriever
-   ↓
-6. FAISS → retrieves top-4 chunks (semantic similarity)
-   ↓
-7. Retriever formats chunks with source citations
-   ↓
-8. Agent receives formatted context
-   ↓
-9. Agent → calls Bedrock Claude with context + query
-   ↓
-10. Claude generates answer grounded in retrieved docs
-    ↓
-11. Response streams back (Bedrock → LangChain → FastAPI SSE → Streamlit)
-    ↓
-12. User sees answer with source citations, token by token
-```
+### Service split
+- frontend service: Streamlit UI
+- backend service: FastAPI, LangChain agent, retrieval, tool execution
+- backend stays private
+- frontend reaches backend through internal service discovery
 
-### Order Status Flow
-```
-1. User: "Check my order status"
-   ↓
-2. Agent: "What is your full name?"
-   ↓
-3. User: "John Smith"
-   ↓
-4. Agent stores in memory, asks: "Last 4 digits of SSN?"
-   ↓
-5. User: "1234"
-   ↓
-6. Agent stores, asks: "Date of birth (YYYY-MM-DD)?"
-   ↓
-7. User: "1990-01-15"
-   ↓
-8. Agent now has all 3 fields → decides to call check_order_status tool
-   ↓
-9. Tool validates inputs (format, presence)
-   ↓
-10. Tool → looks up in mock order database
-    ↓
-11. Returns order info (ID, status, tracking, delivery date)
-    ↓
-12. Agent → formats response for user
-    ↓
-13. User sees order details
-```
+This split better matches production deployment than single-container demo topology.
 
-## AWS Deployment Architecture
+## Data Architecture
+
+### 1. Conversation history
+- store: DynamoDB
+- reason: session-based append and ordered read
+- shape:
+  - partition key: `session_id`
+  - sort key: ordered message key
+  - attributes: role, content, metadata, ttl
+
+### 2. Customer and order operations
+- store: PostgreSQL
+- reason: relational operational data with indexed identity lookup
+- shape:
+  - `customers`
+  - `orders`
+  - `order_items`
+
+### 3. Retrieval corpus
+- store: FAISS
+- reason: current corpus small, cost floor near zero
+- future path: OpenSearch if corpus size or filtering needs justify managed vector search
+
+## Component View
 
 ```
-                              Internet
-                                 │
-                                 ▼
+┌────────────────────────────────────────────────────────────┐
+│ User                                                       │
+└───────────────────────────────┬────────────────────────────┘
+                                │
+                                ▼
                     ┌────────────────────────┐
-                    │  Application Load      │
-                    │  Balancer (ALB)        │
-                    │  - Public subnets      │
-                    └────────────────────────┘
-                                 │
-              ┌──────────────────┴──────────────────┐
-              ▼                                     ▼
-    ┌─────────────────┐                  ┌─────────────────┐
-    │  Availability   │                  │  Availability   │
-    │  Zone 1         │                  │  Zone 2         │
-    │                 │                  │                 │
-    │  ┌───────────┐  │                  │  ┌───────────┐  │
-    │  │ ECS Task  │  │                  │  │ ECS Task  │  │
-    │  │ (Fargate) │  │                  │  │ (Fargate) │  │
-    │  │           │  │                  │  │           │  │
-    │  │ Backend + │  │                  │  │ Backend + │  │
-    │  │ Frontend  │  │                  │  │ Frontend  │  │
-    │  │ Container │  │                  │  │ Container │  │
-    │  └───────────┘  │                  │  └───────────┘  │
-    │  Private Subnet │                  │  Private Subnet │
-    └─────────────────┘                  └─────────────────┘
-              │                                     │
-              └──────────────┬──────────────────────┘
-                             ▼
-                    ┌────────────────┐
-                    │  NAT Gateway   │
-                    └────────────────┘
-                             │
-              ┌──────────────┴──────────────┐
-              ▼                             ▼
-    ┌──────────────────┐         ┌──────────────────┐
-    │  AWS Bedrock     │         │  ECR             │
-    │  - Claude        │         │  - Docker Images │
-    │  - Titan Embed   │         └──────────────────┘
-    └──────────────────┘
-              │
-              ▼
-    ┌──────────────────┐
-    │  CloudWatch Logs │
-    └──────────────────┘
+                    │ ALB                    │
+                    │ public entrypoint      │
+                    └───────────┬────────────┘
+                                │
+                                ▼
+                    ┌────────────────────────┐
+                    │ Frontend ECS Service   │
+                    │ Streamlit              │
+                    └───────────┬────────────┘
+                                │
+                                ▼
+                    ┌────────────────────────┐
+                    │ Backend ECS Service    │
+                    │ FastAPI + LangChain    │
+                    │ SSE streaming          │
+                    └──────┬────────┬────────┘
+                           │        │
+                           │        └───────────────┐
+                           │                        │
+                           ▼                        ▼
+                ┌──────────────────┐      ┌──────────────────┐
+                │ DynamoDB         │      │ PostgreSQL       │
+                │ conversation     │      │ customers/orders │
+                │ history          │      │ operations       │
+                └──────────────────┘      └──────────────────┘
+                           │
+                           ▼
+                ┌──────────────────┐
+                │ FAISS            │
+                │ vector index     │
+                └──────────────────┘
+                           │
+                           ▼
+                ┌──────────────────┐
+                │ AWS Bedrock      │
+                │ Claude + Embed   │
+                └──────────────────┘
 ```
+
+## Request Flows
+
+### Grounded RAG query
+1. user sends question from frontend
+2. backend receives request and loads conversation history from DynamoDB
+3. agent decides retrieval needed
+4. backend queries FAISS index
+5. retrieved context sent to Bedrock
+6. grounded answer streamed back to frontend
+7. conversation state appended to DynamoDB
+
+### Order status workflow
+1. user asks to check order status
+2. agent collects required identity fields across turns
+3. backend reads and writes session history in DynamoDB
+4. once all fields present, tool executes operational lookup in PostgreSQL
+5. backend returns order status only
+6. follow-up questions reuse session context
 
 ## Security Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Security Layers                      │
-│                                                         │
-│  1. Network Security                                    │
-│     ├─ VPC isolation (public/private subnets)          │
-│     ├─ Security groups (least-privilege ingress)       │
-│     └─ NAT Gateway for outbound traffic                │
-│                                                         │
-│  2. Identity & Access                                   │
-│     ├─ IAM roles (no long-term credentials)            │
-│     ├─ Task execution role: ECR + CloudWatch           │
-│     └─ Task role: Bedrock InvokeModel only             │
-│                                                         │
-│  3. Application Security                                │
-│     ├─ CORS restrictions (Streamlit origin only)       │
-│     ├─ Input validation (SSN format, DOB format)       │
-│     └─ Defense-in-depth identity verification          │
-│                                                         │
-│  4. Data Security                                       │
-│     ├─ No PII in logs                                  │
-│     ├─ Ephemeral session data (in-memory)              │
-│     └─ Mock data only (no real customer info)          │
-└─────────────────────────────────────────────────────────┘
-```
+### Network
+- frontend exposed through ALB
+- backend private
+- private compute in VPC
 
-## Data Flow: Identity Verification
+### Identity and access
+- IAM least privilege for ECS tasks
+- backend granted Bedrock access
+- backend granted DynamoDB access for conversation table
+- secrets handled outside source code
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│               Defense-in-Depth Verification                  │
-│                                                              │
-│  Layer 1: System Prompt                                      │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │ "MUST collect ALL THREE before calling tool:          │ │
-│  │  1. Full name                                          │ │
-│  │  2. Last 4 SSN                                         │ │
-│  │  3. Date of birth"                                     │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                          ↓                                   │
-│  Layer 2: Agent Logic (LangChain)                            │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │ - Multi-turn conversation                              │ │
-│  │ - Maintains verification state in memory               │ │
-│  │ - Only calls tool when all fields present              │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                          ↓                                   │
-│  Layer 3: Tool Function Validation                           │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │ def check_order_status(name, ssn, dob):                │ │
-│  │   if not name: return error                            │ │
-│  │   if len(ssn) != 4: return error                       │ │
-│  │   if not valid_date(dob): return error                 │ │
-│  │   return lookup_order(name, ssn, dob)                  │ │
-│  └────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────┘
-```
+### PII handling
+- order workflow requires identity verification before lookup
+- logs use PII redaction
+- operational identity matching uses normalized and hashed fields
+- retrieval data, session data, and operational data remain separate
 
-## Streaming Architecture
+## Observability Architecture
 
-```
-Bedrock Streaming Response
-         │
-         ▼
-┌────────────────────────┐
-│ LangChain astream_events│
-│ - on_chat_model_stream │
-│ - on_tool_start        │
-│ - on_tool_end          │
-└────────────────────────┘
-         │
-         ▼
-┌────────────────────────┐
-│ FastAPI StreamingResponse│
-│ - Server-Sent Events    │
-│ - event: data\n\n format│
-└────────────────────────┘
-         │
-         ▼
-┌────────────────────────┐
-│ httpx.AsyncClient     │
-│ - aiter_lines()        │
-│ - Parse SSE events     │
-└────────────────────────┘
-         │
-         ▼
-┌────────────────────────┐
-│ Streamlit UI           │
-│ - Incremental display  │
-│ - Token-by-token       │
-└────────────────────────┘
-```
+Implemented now:
+- structured JSON logs
+- EMF custom metrics
+- CloudWatch dashboard
+- CloudWatch alarms
 
-## Scalability Considerations
+Main signals:
+- HTTP request latency and error count
+- agent latency
+- RAG retrieval latency
+- order store latency
+- conversation store read/write latency
+- unhealthy frontend targets
 
-### Current (Demo) Scale
-- Single ECS task
-- In-memory session storage
-- Local FAISS index (baked into container)
-- ~20 concurrent users max
+This gives enough baseline visibility for AI-specific runtime behavior without adding heavier tracing systems yet.
 
-### Production Scale (Future)
-```
-┌────────────────────────────────────────────────────────┐
-│                Production Enhancements                 │
-│                                                        │
-│  Compute:                                              │
-│  - ECS Auto Scaling (2-10 tasks based on CPU/memory)  │
-│  - Multiple AZs for high availability                  │
-│                                                        │
-│  Memory:                                               │
-│  - DynamoDB for conversation history (persistent)      │
-│  - ElastiCache for session caching                     │
-│                                                        │
-│  RAG:                                                  │
-│  - OpenSearch Serverless for vector store              │
-│  - S3 for document storage                             │
-│  - Lambda for document preprocessing pipeline          │
-│                                                        │
-│  Observability:                                        │
-│  - LangSmith for agent tracing                         │
-│  - X-Ray for distributed tracing                       │
-│  - CloudWatch dashboards + alarms                      │
-│  - Application insights                                │
-│                                                        │
-│  Security:                                             │
-│  - WAF on ALB                                          │
-│  - Secrets Manager for API keys                        │
-│  - KMS for data encryption                             │
-│  - VPC endpoints (no internet egress)                  │
-└────────────────────────────────────────────────────────┘
-```
+## Scalability
 
-## Cost Breakdown
+### Current state
+- ECS services scale from current task settings
+- DynamoDB conversation model supports concurrent sessions well
+- PostgreSQL handles current operational lookup path
+- FAISS remains acceptable for current corpus size
 
-### Per-Request Cost Model
-```
-Single RAG Query:
-- Titan Embedding (query): ~$0.000004 (200 tokens)
-- Titan Embedding (4 chunks retrieved): ~$0.000080 (4000 tokens)
-- Claude Haiku (input): ~$0.00025 (1000 tokens context)
-- Claude Haiku (output): ~$0.000125 (100 tokens response)
-───────────────────────────────────────────────────────────
-Total per query: ~$0.00046
+### Future state
+- increase ECS desired count as traffic grows
+- scale PostgreSQL vertically first, then replicas or Aurora-style path if needed
+- move from FAISS to OpenSearch when vector workload justifies managed search
 
-Order Status Check (no RAG):
-- Claude Haiku (input): ~$0.000125 (500 tokens)
-- Claude Haiku (output): ~$0.000125 (100 tokens)
-───────────────────────────────────────────────────────────
-Total per check: ~$0.00025
+## Design Decisions
 
-Infrastructure (monthly, 8 hrs/day):
-- ECS Fargate: $2.40
-- ALB: $4.80
-- NAT Gateway: $10.80
-- CloudWatch + ECR: $0.60
-───────────────────────────────────────────────────────────
-Fixed: ~$18.60/month
-Variable: ~$2-5/month (inference at demo volumes)
-Total: ~$20-23/month
-```
+### Why DynamoDB for memory
+- access pattern narrow and predictable
+- better fit than relational storage for session history
+- good horizontal scaling behavior
 
-## Technology Stack Summary
+### Why PostgreSQL for orders
+- operational data relational by nature
+- joins, indexing, and integrity constraints matter
+- stronger business-data fit than DynamoDB
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | Streamlit 1.40+ | Chat UI, async streaming |
-| **Backend** | FastAPI 0.115+ | REST API, SSE streaming |
-| **Agent** | LangChain 0.3+ | ReAct agent orchestration |
-| **LLM** | Bedrock Claude 3 Haiku | Chat generation, tool calling |
-| **Embeddings** | Bedrock Titan v2 | Text vectorization |
-| **Vector Store** | FAISS (CPU) | Semantic search |
-| **Memory** | LangChain ChatMessageHistory | Session state |
-| **IaC** | Terraform 1.5+ | Infrastructure provisioning |
-| **Compute** | ECS Fargate | Serverless containers |
-| **CI/CD** | GitHub Actions | Automated deployment |
-| **Monitoring** | CloudWatch | Logs and basic metrics |
+### Why FAISS for retrieval
+- assignment corpus small
+- cost-aware
+- simple local retrieval path
 
-## Next: Level 300 Architecture
+### Why not OpenSearch yet
+- valid production option
+- cost floor too high for current scale
+- kept as optional future step, not forced into current implementation
 
-If implementing Level 300, the architecture would add:
+## Current vs Future State
 
-1. **Data Layer**: PostgreSQL (RDS) with conversation history table
-2. **Observability**: LangSmith + X-Ray for full request tracing
-3. **Classification**: Pre-routing Lambda for intent classification
-4. **Preprocessing**: Step Functions pipeline for document ingestion
-5. **Evaluation**: Offline RAGAS pipeline for RAG quality metrics
+### Implemented now
+- frontend/backend split on ECS
+- DynamoDB-backed conversation persistence
+- PostgreSQL-backed operational data
+- FAISS retrieval
+- CloudWatch logs, metrics, dashboard, alarms
 
-See `SUBMISSION_SUMMARY.md` for details.
+### Future enhancements
+- OpenSearch for managed vector retrieval
+- X-Ray tracing
+- LangSmith traces
+- richer alert routing and evaluation pipeline
+
+## Architecture Message For Review
+
+`Main architecture choice was to separate session state, operational business data, and retrieval data by access pattern, then keep current implementation cost-aware while preserving a clear production migration path.`

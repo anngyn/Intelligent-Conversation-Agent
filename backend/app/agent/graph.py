@@ -1,5 +1,7 @@
 """LangChain agent construction and execution."""
 
+import boto3
+from botocore.config import Config
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_aws import ChatBedrockConverse
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -22,10 +24,20 @@ def create_agent(retriever: FormattedRetriever) -> RunnableWithMessageHistory:
     Returns:
         Agent executor wrapped with message history
     """
+    # Configure Bedrock client with retry + timeout
+    bedrock_config = Config(
+        read_timeout=30,  # 30s timeout prevents hanging
+        retries={
+            "max_attempts": 3,  # Retry up to 3 times
+            "mode": "adaptive",  # Exponential backoff with jitter
+        },
+    )
+
     llm = ChatBedrockConverse(
         model=settings.bedrock_model_id,
         region_name=settings.aws_region,
         temperature=0,
+        client=boto3.client("bedrock-runtime", config=bedrock_config),
     )
 
     tools = create_tools(retriever)
