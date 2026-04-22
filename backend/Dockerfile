@@ -1,5 +1,7 @@
 # Multi-stage build for backend
-FROM python:3.11-slim as builder
+ARG TARGETPLATFORM=linux/amd64
+
+FROM --platform=${TARGETPLATFORM} python:3.11-slim AS builder
 
 WORKDIR /build
 
@@ -7,7 +9,7 @@ COPY backend/pyproject.toml ./pyproject.toml
 COPY backend/app/ ./app/
 RUN pip install --no-cache-dir .
 
-FROM python:3.11-slim
+FROM --platform=${TARGETPLATFORM} python:3.11-slim
 
 WORKDIR /app
 
