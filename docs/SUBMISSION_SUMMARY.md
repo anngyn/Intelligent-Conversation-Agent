@@ -3,8 +3,8 @@
 **Project**: Agentic Conversational System  
 **Assignment**: Cloud Kinetics SA AI/Data Intern Assignment  
 **Candidate**: `Nguyen An`  
-**Repository**: `[Repository](https://github.com/anngyn/Intelligent-Conversation-Agent/)`  
-**Demo Video**: `[Video Demo](https://drive.google.com/drive/folders/1Yz3UMZMw3nhW4KOxQIreBRK69uvde9ki?usp=drive_link)`  
+**Repository**: [Repository](https://github.com/anngyn/Intelligent-Conversation-Agent/) 
+**Demo Video**: [Video Demo](https://drive.google.com/drive/folders/1Yz3UMZMw3nhW4KOxQIreBRK69uvde9ki?usp=drive_link)
 **Date**: April 22, 2026
 
 ## 1. Solution Overview
