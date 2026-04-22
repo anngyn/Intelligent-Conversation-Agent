@@ -30,6 +30,8 @@ Agentic conversational system for e-commerce use cases:
 
 ## Architecture Summary
 
+![AWS Architecture](docs/architect.png)
+
 ### Runtime topology
 - `ALB -> frontend ECS service -> backend ECS service`
 - backend invokes Bedrock for generation and embeddings
