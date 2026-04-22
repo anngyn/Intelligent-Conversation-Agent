@@ -202,12 +202,11 @@ See [docs/OBSERVABILITY_DESIGN.md](/D:/An/Project/Assignment/docs/OBSERVABILITY_
 ## Documentation Map
 
 - [Submission Summary](/D:/An/Project/Assignment/docs/SUBMISSION_SUMMARY.md:1)
+- [Deployment Flow](/D:/An/Project/Assignment/docs/DEPLOYMENT_FLOW.md:1)
 - [Design Decisions](/D:/An/Project/Assignment/docs/DESIGN_DECISIONS.md:1)
 - [Data Design](/D:/An/Project/Assignment/docs/DATA_DESIGN.md:1)
 - [Observability Design](/D:/An/Project/Assignment/docs/OBSERVABILITY_DESIGN.md:1)
-- [Demo Script](/D:/An/Project/Assignment/docs/DEMO_SCRIPT.md:1)
-- [Presentation Guide](/D:/An/Project/Assignment/docs/PRESENTATION.md:1)
-- [AWS Architecture Diagram](/D:/An/Project/Assignment/docs/system-architecture-aws.drawio)
+- [Architecture Notes](/D:/An/Project/Assignment/docs/ARCHITECTURE.md:1)
 
 ## Current Limitations
 

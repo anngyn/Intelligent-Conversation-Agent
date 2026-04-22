@@ -1,0 +1,21 @@
+{
+  "family": "agentic-system-frontend-debug",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::503130572927:role/agentic-system-ecs-task-execution-role",
+  "containerDefinitions": [
+    {
+      "name": "frontend",
+      "image": "503130572927.dkr.ecr.us-east-1.amazonaws.com/agentic-system-frontend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8501,
+          "protocol": "tcp"
+        }
+      ]
+    }
+  ]
+}

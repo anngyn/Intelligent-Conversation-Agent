@@ -1,0 +1,36 @@
+{
+  "family": "agentic-system-frontend-debug-full",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::503130572927:role/agentic-system-ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::503130572927:role/agentic-system-ecs-task-role",
+  "containerDefinitions": [
+    {
+      "name": "frontend",
+      "image": "503130572927.dkr.ecr.us-east-1.amazonaws.com/agentic-system-frontend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8501,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "BACKEND_URL",
+          "value": "http://backend.agentic-system.internal:8000/api"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/agentic-system/frontend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

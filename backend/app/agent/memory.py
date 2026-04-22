@@ -81,7 +81,8 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
         summary_text = _summarize_old_messages(old_messages)
 
         # Create new history with summary + recent messages
-        new_messages: list[BaseMessage] = [AIMessage(content=summary_text), *recent_messages]
+        # IMPORTANT: Use HumanMessage to avoid Bedrock "conversation must start with user message" error
+        new_messages: list[BaseMessage] = [HumanMessage(content=summary_text), *recent_messages]
 
         if isinstance(history, ReplaceableChatHistory):
             history.replace_messages(new_messages)

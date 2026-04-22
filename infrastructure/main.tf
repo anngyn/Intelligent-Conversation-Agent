@@ -15,6 +15,20 @@ locals {
   backend_service_url            = "http://${local.backend_service_discovery_name}.${aws_service_discovery_private_dns_namespace.internal.name}:8000/api"
   monitoring_alarm_actions       = trimspace(var.alarm_notification_topic_arn) != "" ? [trimspace(var.alarm_notification_topic_arn)] : []
   monitoring_dashboard_name      = "${var.project_name}-${var.environment}-overview"
+  frontend_container_definitions = jsonencode(jsondecode(templatefile("${path.module}/templates/frontend-container-definitions.json.tftpl", {
+    image               = local.frontend_image
+    backend_service_url = local.backend_service_url
+    awslogs_group       = aws_cloudwatch_log_group.frontend.name
+    aws_region          = var.aws_region
+  })))
+  backend_container_definitions = jsonencode(jsondecode(templatefile("${path.module}/templates/backend-container-definitions.json.tftpl", {
+    image                   = local.backend_image
+    aws_region              = var.aws_region
+    conversation_table_name = aws_dynamodb_table.conversation_history.name
+    order_database_url_arn  = aws_secretsmanager_secret.order_database_url.arn
+    pii_hash_salt_arn       = aws_secretsmanager_secret.pii_hash_salt.arn
+    awslogs_group           = aws_cloudwatch_log_group.backend.name
+  })))
 }
 
 # VPC and Networking
@@ -627,29 +641,7 @@ resource "aws_ecs_task_definition" "frontend" {
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
-  container_definitions = jsonencode([{
-    name      = "frontend"
-    image     = local.frontend_image
-    essential = true
-    portMappings = [{
-      containerPort = 8501
-      protocol      = "tcp"
-    }]
-    environment = [
-      {
-        name  = "BACKEND_URL"
-        value = local.backend_service_url
-      }
-    ]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.frontend.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "ecs"
-      }
-    }
-  }])
+  container_definitions = local.frontend_container_definitions
 }
 
 resource "aws_ecs_task_definition" "backend" {
@@ -661,55 +653,7 @@ resource "aws_ecs_task_definition" "backend" {
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
-  container_definitions = jsonencode([{
-    name      = "backend"
-    image     = local.backend_image
-    essential = true
-    portMappings = [{
-      containerPort = 8000
-      protocol      = "tcp"
-    }]
-    environment = [
-      {
-        name  = "AWS_REGION"
-        value = var.aws_region
-      },
-      {
-        name  = "CONVERSATION_STORAGE_BACKEND"
-        value = "dynamodb"
-      },
-      {
-        name  = "CONVERSATION_TABLE_NAME"
-        value = aws_dynamodb_table.conversation_history.name
-      },
-      {
-        name  = "ORDER_STORAGE_BACKEND"
-        value = "postgres"
-      },
-      {
-        name  = "ORDER_SEED_ON_STARTUP"
-        value = "false"
-      }
-    ]
-    secrets = [
-      {
-        name      = "ORDER_DATABASE_URL"
-        valueFrom = aws_secretsmanager_secret.order_database_url.arn
-      },
-      {
-        name      = "PII_HASH_SALT"
-        valueFrom = aws_secretsmanager_secret.pii_hash_salt.arn
-      }
-    ]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.backend.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "ecs"
-      }
-    }
-  }])
+  container_definitions = local.backend_container_definitions
 }
 
 # ECS Services
@@ -767,7 +711,8 @@ resource "aws_cloudwatch_metric_alarm" "agent_latency_high" {
   ok_actions          = local.monitoring_alarm_actions
 
   metric_query {
-    id = "latency"
+    id          = "latency"
+    return_data = true
     metric {
       namespace   = "AgentMetrics"
       metric_name = "AgentLatency"
@@ -791,7 +736,8 @@ resource "aws_cloudwatch_metric_alarm" "rag_retrieval_latency_high" {
   ok_actions          = local.monitoring_alarm_actions
 
   metric_query {
-    id = "rag"
+    id          = "rag"
+    return_data = true
     metric {
       namespace   = "AgentMetrics"
       metric_name = "RAGRetrievalTime"
@@ -815,7 +761,8 @@ resource "aws_cloudwatch_metric_alarm" "order_store_latency_high" {
   ok_actions          = local.monitoring_alarm_actions
 
   metric_query {
-    id = "orders"
+    id          = "orders"
+    return_data = true
     metric {
       namespace   = "AgentMetrics"
       metric_name = "OrderStoreLatency"
@@ -839,7 +786,8 @@ resource "aws_cloudwatch_metric_alarm" "chat_stream_errors" {
   ok_actions          = local.monitoring_alarm_actions
 
   metric_query {
-    id = "errors"
+    id          = "errors"
+    return_data = true
     metric {
       namespace   = "AgentMetrics"
       metric_name = "ErrorRate"

@@ -262,6 +262,23 @@ aws iam create-open-id-connect-provider \
 
 ## Troubleshooting
 
+### Docker build errors
+
+**Error**: `exec /bin/sh: exec format error` or `exec /usr/local/bin/python: exec format error`
+- **Cause**: Docker Desktop / WSL backend is in a bad state, or the local builder cannot execute the requested Linux platform correctly.
+- **Solution**:
+  - Restart Docker Desktop
+  - Run `wsl --shutdown` and then reopen Docker Desktop
+  - Verify the runtime with:
+    ```bash
+    docker run --rm --platform linux/amd64 python:3.11-slim python -V
+    ```
+  - If the default builder still fails, create a clean Buildx builder:
+    ```bash
+    docker buildx create --name ckbuilder --driver docker-container --use
+    docker buildx inspect --bootstrap
+    ```
+
 ### Backend won't start
 
 **Error**: `FileNotFoundError: FAISS index not found`
@@ -284,6 +301,26 @@ aws iam create-open-id-connect-provider \
 
 **Error**: `Error creating VPC: VpcLimitExceeded`
 - **Solution**: Delete unused VPCs or request limit increase
+
+**Error**: `ClientException: Container.image contains invalid characters`
+- **Cause**: ECS rejected the rendered `container_definitions` payload during `RegisterTaskDefinition`. In this project, the image URI itself may still look valid in `terraform console`; the actual issue was the JSON payload generated for the task definition.
+- **Solution**:
+  - Use the JSON template-based task definition payload in `infrastructure/templates/`
+  - Re-run:
+    ```bash
+    terraform plan
+    terraform apply
+    ```
+  - If it happens again, verify the resolved image strings with:
+    ```bash
+    terraform console
+    local.frontend_image
+    local.backend_image
+    ```
+  - A valid image string should look like:
+    ```text
+    503130572927.dkr.ecr.us-east-1.amazonaws.com/agentic-system-frontend:latest
+    ```
 
 ### High AWS Costs
 

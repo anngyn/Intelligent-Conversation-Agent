@@ -175,9 +175,13 @@ class DynamoDBConversationHistory(MessageNormalizationMixin, ReplaceableChatHist
         normalized_messages = self._normalize_messages(messages)
         ttl = int(time.time()) + (self.ttl_days * 24 * 60 * 60)
 
+        # Ensure strictly increasing timestamps for message ordering
+        base_timestamp = int(time.time() * 1000)
+
         with self.table.batch_writer() as batch:
-            for message in normalized_messages:
-                created_at = int(time.time() * 1000)
+            for index, message in enumerate(normalized_messages):
+                # Add index to guarantee ordering within same millisecond
+                created_at = base_timestamp + index
                 batch.put_item(
                     Item={
                         "session_id": self.session_id,

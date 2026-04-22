@@ -1,0 +1,41 @@
+{
+  "family": "agentic-system-backend-debug-full",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::503130572927:role/agentic-system-ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::503130572927:role/agentic-system-ecs-task-role",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "503130572927.dkr.ecr.us-east-1.amazonaws.com/agentic-system-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "AWS_REGION", "value": "us-east-1" },
+        { "name": "CONVERSATION_STORAGE_BACKEND", "value": "dynamodb" },
+        { "name": "CONVERSATION_TABLE_NAME", "value": "agentic-system-conversation-history" },
+        { "name": "ORDER_STORAGE_BACKEND", "value": "postgres" },
+        { "name": "ORDER_SEED_ON_STARTUP", "value": "false" }
+      ],
+      "secrets": [
+        { "name": "ORDER_DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:us-east-1:503130572927:secret:agentic-system/backend/order-database-url" },
+        { "name": "PII_HASH_SALT", "valueFrom": "arn:aws:secretsmanager:us-east-1:503130572927:secret:agentic-system/backend/pii-hash-salt" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/agentic-system/backend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

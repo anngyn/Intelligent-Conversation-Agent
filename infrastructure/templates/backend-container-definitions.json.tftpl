@@ -1,0 +1,53 @@
+[
+  {
+    "name": "backend",
+    "image": ${jsonencode(image)},
+    "essential": true,
+    "portMappings": [
+      {
+        "containerPort": 8000,
+        "protocol": "tcp"
+      }
+    ],
+    "environment": [
+      {
+        "name": "AWS_REGION",
+        "value": ${jsonencode(aws_region)}
+      },
+      {
+        "name": "CONVERSATION_STORAGE_BACKEND",
+        "value": "dynamodb"
+      },
+      {
+        "name": "CONVERSATION_TABLE_NAME",
+        "value": ${jsonencode(conversation_table_name)}
+      },
+      {
+        "name": "ORDER_STORAGE_BACKEND",
+        "value": "postgres"
+      },
+      {
+        "name": "ORDER_SEED_ON_STARTUP",
+        "value": "true"
+      }
+    ],
+    "secrets": [
+      {
+        "name": "ORDER_DATABASE_URL",
+        "valueFrom": ${jsonencode(order_database_url_arn)}
+      },
+      {
+        "name": "PII_HASH_SALT",
+        "valueFrom": ${jsonencode(pii_hash_salt_arn)}
+      }
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": ${jsonencode(awslogs_group)},
+        "awslogs-region": ${jsonencode(aws_region)},
+        "awslogs-stream-prefix": "ecs"
+      }
+    }
+  }
+]
