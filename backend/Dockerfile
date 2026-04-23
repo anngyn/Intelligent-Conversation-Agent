@@ -17,9 +17,10 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code and vector index
+# Copy application code, vector index, and mock data
 COPY backend/app/ ./app/
 COPY dataset/processed/ ./dataset/processed/
+COPY dataset/mock/ ./dataset/mock/
 
 # Expose port
 EXPOSE 8000

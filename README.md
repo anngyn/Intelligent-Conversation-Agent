@@ -88,6 +88,22 @@ Agentic conversational system for e-commerce use cases:
 - good fit for always-on frontend/backend services and streaming behavior
 - simpler than Lambda for this app shape
 
+## Live Demo
+
+**URL:** http://agentic-system-alb-591698599.us-east-1.elb.amazonaws.com
+
+**Test Accounts:**
+- Name: `John Smith`, SSN: `1234`, DOB: `1990-01-15` → Order `ORD-98765` (Shipped)
+- Name: `Jane Doe`, SSN: `5678`, DOB: `1985-06-20` → Order `ORD-54321` (Delivered)
+- Name: `Michael Johnson`, SSN: `9012`, DOB: `1992-11-03` → Order `ORD-76543` (Processing)
+
+**RAG Test Queries:**
+- "What was Amazon's total revenue in 2023?"
+- "What are Amazon's risk factors?"
+- "Describe AWS business segment"
+
+---
+
 ## Quick Start
 
 ### Prerequisites

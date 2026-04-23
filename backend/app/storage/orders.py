@@ -308,12 +308,28 @@ def initialize_order_store() -> None:
     if isinstance(store, SQLAlchemyOrderStore):
         store.initialize_schema()
         logger.info("order_store_initialized", extra={"backend": "postgres"})
+
+        logger.info(
+            "order_seed_check",
+            extra={
+                "seed_on_startup": settings.order_seed_on_startup,
+                "seed_file": settings.order_seed_file_path,
+            },
+        )
+
         if settings.order_seed_on_startup:
-            seeded = store.seed_from_json(settings.order_seed_file_path)
-            logger.info(
-                "order_store_seeded",
-                extra={"backend": "postgres", "records": seeded},
-            )
+            try:
+                seeded = store.seed_from_json(settings.order_seed_file_path)
+                logger.info(
+                    "order_store_seeded",
+                    extra={"backend": "postgres", "records": seeded},
+                )
+            except Exception as e:
+                logger.error(
+                    "order_store_seed_failed",
+                    extra={"backend": "postgres", "error": str(e)},
+                    exc_info=True,
+                )
 
 
 def seed_order_store(source_path: str | Path | None = None) -> int:

@@ -22,6 +22,14 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: load FAISS index and initialize agent on startup."""
+    import os
+    logger.info(
+        "startup_env_check",
+        extra={
+            "ORDER_SEED_ON_STARTUP_env": os.getenv("ORDER_SEED_ON_STARTUP"),
+            "order_seed_on_startup_setting": settings.order_seed_on_startup,
+        },
+    )
     initialize_order_store()
     logger.info("Order store initialized")
 
