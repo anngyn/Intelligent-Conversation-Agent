@@ -173,6 +173,70 @@ Old conversations stored in `agentic-system-conversation-history` table. Just ne
 
 ---
 
+## Issue 5: GitHub Actions CD Workflow - Terraform Backend Not Found
+
+**Error:**
+```
+Error: Backend initialization required: Run "terraform init"
+```
+
+**Root Cause:**
+Terraform backend commented out → local state file not committed to Git → CI can't access existing infrastructure state.
+
+**Solution:**
+
+**1. Create S3 backend:**
+```bash
+# S3 bucket for state storage
+aws s3 mb s3://terraform-state-agentic-system-<account-id> --region us-east-1
+aws s3api put-bucket-versioning --bucket terraform-state-agentic-system-<account-id> \
+  --versioning-configuration Status=Enabled
+aws s3api put-public-access-block --bucket terraform-state-agentic-system-<account-id> \
+  --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+
+# DynamoDB table for state locking
+aws dynamodb create-table \
+  --table-name terraform-lock-agentic-system \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST
+```
+
+**2. Configure backend in `infrastructure/providers.tf`:**
+```hcl
+backend "s3" {
+  bucket         = "terraform-state-agentic-system-<account-id>"
+  key            = "agentic-system/terraform.tfstate"
+  region         = "us-east-1"
+  dynamodb_table = "terraform-lock-agentic-system"
+  encrypt        = true
+}
+```
+
+**3. Migrate local state:**
+```bash
+cd infrastructure
+terraform init -migrate-state
+# Answer "yes" when prompted
+```
+
+**4. Update GitHub Actions IAM role permissions:**
+Add S3 + DynamoDB permissions to role policy (see `github-actions-permissions.json`).
+
+**Verify:**
+```bash
+aws s3 ls s3://terraform-state-agentic-system-<account-id>/agentic-system/
+# Should see: terraform.tfstate
+```
+
+**Benefits:**
+- CI/CD can access shared state
+- State versioning enabled (rollback capability)
+- State locking prevents concurrent modifications
+- Encrypted at rest
+
+---
+
 ## Deployment Flow
 
 After code fixes:

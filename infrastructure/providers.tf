@@ -12,12 +12,14 @@ terraform {
     }
   }
 
-  # Optional: Configure S3 backend for state storage
-  # backend "s3" {
-  #   bucket = "your-terraform-state-bucket"
-  #   key    = "agentic-system/terraform.tfstate"
-  #   region = "us-east-1"
-  # }
+  # S3 backend for shared state across CI/CD and local
+  backend "s3" {
+    bucket         = "terraform-state-agentic-system-503130572927"
+    key            = "agentic-system/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-lock-agentic-system"
+    encrypt        = true
+  }
 }
 
 provider "aws" {

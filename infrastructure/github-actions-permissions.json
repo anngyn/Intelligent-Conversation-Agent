@@ -53,8 +53,8 @@
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::terraform-state-agentic-system",
-        "arn:aws:s3:::terraform-state-agentic-system/*"
+        "arn:aws:s3:::terraform-state-agentic-system-503130572927",
+        "arn:aws:s3:::terraform-state-agentic-system-503130572927/*"
       ]
     },
     {
