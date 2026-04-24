@@ -68,17 +68,93 @@
       "Resource": "arn:aws:dynamodb:us-east-1:503130572927:table/terraform-lock-agentic-system"
     },
     {
-      "Sid": "TerraformResources",
+      "Sid": "TerraformEC2",
       "Effect": "Allow",
       "Action": [
-        "ec2:Describe*",
-        "elasticloadbalancing:Describe*",
-        "logs:Describe*",
-        "logs:CreateLogGroup",
-        "cloudwatch:PutMetricAlarm",
-        "cloudwatch:PutDashboard"
+        "ec2:*"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "TerraformELB",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformCloudWatch",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformRDS",
+      "Effect": "Allow",
+      "Action": [
+        "rds:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformDynamoDB",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformSecretsManager",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformServiceDiscovery",
+      "Effect": "Allow",
+      "Action": [
+        "servicediscovery:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformIAM",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRolePolicies",
+        "iam:ListPolicyVersions",
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:TagRole",
+        "iam:UntagRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::503130572927:role/agentic-system-*",
+        "arn:aws:iam::503130572927:policy/agentic-system-*"
+      ]
     }
   ]
 }
