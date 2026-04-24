@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build backend image
-        run: docker build -t backend:test ./backend
+        run: docker build -f backend/Dockerfile -t backend:test .
 
       - name: Build frontend image
         run: docker build -t frontend:test ./frontend
