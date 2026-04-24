@@ -7,7 +7,6 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-
 # Common 10-K section headers for metadata extraction
 SECTION_PATTERNS = [
     r"^ITEM\s+\d+[A-Z]?[\.\:]",  # ITEM 1, ITEM 1A, etc.

@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from typing import Optional
 
 
 def load_mock_orders() -> dict[tuple[str, str, str], dict]:
@@ -31,7 +30,7 @@ def lookup_order(
     full_name: str,
     last4_ssn: str,
     date_of_birth: str,
-) -> Optional[dict]:
+) -> dict | None:
     """
     Look up an order by customer verification information.
 

@@ -3,7 +3,7 @@
 import logging
 
 from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage
 
 from app.storage.conversation import (
     ReplaceableChatHistory,

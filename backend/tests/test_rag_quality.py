@@ -5,7 +5,6 @@ import pytest
 from app.rag.retriever import FormattedRetriever
 from app.rag.store import load_vector_store
 
-
 # Golden dataset (hand-labeled test cases)
 EVAL_DATASET = [
     {

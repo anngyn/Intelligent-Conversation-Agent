@@ -1,10 +1,9 @@
 """API route definitions."""
 
 import asyncio
-import json
 import logging
 import time
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse

@@ -12,14 +12,20 @@ from typing import Any
 import boto3
 from boto3.dynamodb.conditions import Key
 from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, message_to_dict, messages_from_dict
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    message_to_dict,
+    messages_from_dict,
+)
 
 from app.config import settings
 from app.observability import emit_metrics
 
 logger = logging.getLogger(__name__)
 
-_in_memory_histories: dict[str, "NormalizedInMemoryHistory"] = {}
+_in_memory_histories: dict[str, NormalizedInMemoryHistory] = {}
 _warned_backends: set[str] = set()
 
 
@@ -32,8 +38,7 @@ class MessageNormalizationMixin:
             return content
         if isinstance(content, list):
             return "".join(
-                MessageNormalizationMixin._stringify_content_blocks(item)
-                for item in content
+                MessageNormalizationMixin._stringify_content_blocks(item) for item in content
             )
         if isinstance(content, dict):
             if "text" in content:
@@ -102,9 +107,7 @@ class MessageNormalizationMixin:
         normalized_messages: list[BaseMessage] = []
         for index, message in enumerate(messages):
             default_role = "human" if index == 0 else "assistant"
-            normalized_messages.append(
-                self._normalize_message(message, default_role=default_role)
-            )
+            normalized_messages.append(self._normalize_message(message, default_role=default_role))
         return normalized_messages
 
 
@@ -196,7 +199,11 @@ class DynamoDBConversationHistory(MessageNormalizationMixin, ReplaceableChatHist
         emit_metrics(
             metrics=[
                 {"Name": "ConversationWriteLatency", "Unit": "Milliseconds", "Value": latency_ms},
-                {"Name": "ConversationMessagesWritten", "Unit": "Count", "Value": len(normalized_messages)},
+                {
+                    "Name": "ConversationMessagesWritten",
+                    "Unit": "Count",
+                    "Value": len(normalized_messages),
+                },
             ],
             dimensions={"Backend": "dynamodb"},
             properties={"session_id": self.session_id},

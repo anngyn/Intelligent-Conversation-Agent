@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan: load FAISS index and initialize agent on startup."""
     import os
+
     logger.info(
         "startup_env_check",
         extra={
@@ -117,6 +118,7 @@ async def log_http_requests(request: Request, call_next):
         )
 
     return response
+
 
 app.add_middleware(
     CORSMiddleware,

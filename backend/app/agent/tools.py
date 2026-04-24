@@ -58,7 +58,9 @@ def create_tools(retriever: FormattedRetriever) -> list:
                     dimensions={"Tool": "search_knowledge_base"},
                     properties={"query_length": len(query), "result": "no_context"},
                 )
-                return "NO_CONTEXT_FOUND: I don't have information about this in our knowledge base."
+                return (
+                    "NO_CONTEXT_FOUND: I don't have information about this in our knowledge base."
+                )
 
             # Add instruction for LLM to enforce grounding
             emit_metrics(

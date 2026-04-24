@@ -10,9 +10,7 @@ class Settings(BaseSettings):
 
     backend_root: Path = Path(__file__).resolve().parents[1]
     app_root: Path = (
-        backend_root.parent
-        if (backend_root.parent / "dataset").exists()
-        else backend_root
+        backend_root.parent if (backend_root.parent / "dataset").exists() else backend_root
     )
 
     # AWS Configuration

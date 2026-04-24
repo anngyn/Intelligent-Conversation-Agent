@@ -1,6 +1,6 @@
 """Pydantic models for API requests and responses."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -12,7 +12,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="User message")
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Types of SSE events."""
 
     TOKEN = "token"

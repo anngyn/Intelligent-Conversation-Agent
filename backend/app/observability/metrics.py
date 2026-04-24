@@ -39,8 +39,7 @@ def emit_metrics(
     """Emit a batch of EMF metrics without extra dependencies."""
     dimension_data = dict(dimensions or {})
     emf_metrics = [
-        {"Name": metric["Name"], "Unit": metric.get("Unit", "Count")}
-        for metric in metrics
+        {"Name": metric["Name"], "Unit": metric.get("Unit", "Count")} for metric in metrics
     ]
 
     payload: dict[str, Any] = {

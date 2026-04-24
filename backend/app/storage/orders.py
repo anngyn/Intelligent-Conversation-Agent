@@ -13,8 +13,24 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Date, DateTime, ForeignKey, Index, String, UniqueConstraint, create_engine, select
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, selectinload, sessionmaker
+from sqlalchemy import (
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    create_engine,
+    select,
+)
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    selectinload,
+    sessionmaker,
+)
 
 from app.config import settings
 from app.observability import emit_metrics
@@ -31,7 +47,7 @@ def normalize_full_name(full_name: str) -> str:
 
 def hash_pii(value: str, salt: str) -> str:
     """Hash sensitive fields before storing or querying them."""
-    return hashlib.sha256(f"{value.strip()}::{salt}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{value.strip()}::{salt}".encode()).hexdigest()
 
 
 def format_order_status(order: dict[str, Any]) -> str:
@@ -87,16 +103,16 @@ class Customer(Base):
     date_of_birth_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-    orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
+    orders: Mapped[list[Order]] = relationship(
+        back_populates="customer", cascade="all, delete-orphan"
+    )
 
 
 class Order(Base):
     """Operational order record."""
 
     __tablename__ = "orders"
-    __table_args__ = (
-        Index("ix_orders_customer_updated", "customer_id", "updated_at"),
-    )
+    __table_args__ = (Index("ix_orders_customer_updated", "customer_id", "updated_at"),)
 
     order_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     customer_id: Mapped[str] = mapped_column(ForeignKey("customers.customer_id"), nullable=False)
@@ -114,7 +130,9 @@ class Order(Base):
     )
 
     customer: Mapped[Customer] = relationship(back_populates="orders")
-    items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    items: Mapped[list[OrderItem]] = relationship(
+        back_populates="order", cascade="all, delete-orphan"
+    )
 
 
 class OrderItem(Base):
@@ -152,7 +170,9 @@ class SQLAlchemyOrderStore:
     def initialize_schema(self) -> None:
         Base.metadata.create_all(self.engine)
 
-    def lookup_order(self, full_name: str, last4_ssn: str, date_of_birth: str) -> dict[str, Any] | None:
+    def lookup_order(
+        self, full_name: str, last4_ssn: str, date_of_birth: str
+    ) -> dict[str, Any] | None:
         start_time = time.perf_counter()
         full_name_normalized = normalize_full_name(full_name)
         ssn_hash = hash_pii(last4_ssn, self.pii_hash_salt)
@@ -267,7 +287,9 @@ class MockOrderStore:
         self.source_path = Path(source_path)
         self.orders = self._load_orders()
 
-    def lookup_order(self, full_name: str, last4_ssn: str, date_of_birth: str) -> dict[str, Any] | None:
+    def lookup_order(
+        self, full_name: str, last4_ssn: str, date_of_birth: str
+    ) -> dict[str, Any] | None:
         start_time = time.perf_counter()
         key = (
             normalize_full_name(full_name),
