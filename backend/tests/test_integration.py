@@ -10,8 +10,7 @@ from app.rag.store import load_vector_store
 
 # Skip tests requiring AWS Bedrock in CI
 pytestmark = pytest.mark.skipif(
-    os.getenv("CI") == "true",
-    reason="Integration tests require AWS Bedrock credentials"
+    os.getenv("CI") == "true", reason="Integration tests require AWS Bedrock credentials"
 )
 
 

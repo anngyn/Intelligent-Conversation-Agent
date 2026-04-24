@@ -9,8 +9,7 @@ from app.rag.store import load_vector_store
 
 # Skip tests requiring AWS Bedrock in CI
 pytestmark = pytest.mark.skipif(
-    os.getenv("CI") == "true",
-    reason="RAG quality tests require AWS Bedrock credentials"
+    os.getenv("CI") == "true", reason="RAG quality tests require AWS Bedrock credentials"
 )
 
 # Golden dataset (hand-labeled test cases)
