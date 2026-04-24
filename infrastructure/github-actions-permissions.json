@@ -15,7 +15,9 @@
         "ecr:CompleteLayerUpload",
         "ecr:DescribeRepositories",
         "ecr:ListImages",
-        "ecr:ListTagsForResource"
+        "ecr:ListTagsForResource",
+        "ecr:GetLifecyclePolicy",
+        "ecr:PutLifecyclePolicy"
       ],
       "Resource": "*"
     },
