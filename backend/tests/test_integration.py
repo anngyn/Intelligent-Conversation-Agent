@@ -1,10 +1,18 @@
 """Integration tests for end-to-end agent flows."""
 
+import os
+
 import pytest
 
 from app.agent.graph import create_agent
 from app.rag.retriever import FormattedRetriever
 from app.rag.store import load_vector_store
+
+# Skip tests requiring AWS Bedrock in CI
+pytestmark = pytest.mark.skipif(
+    os.getenv("CI") == "true",
+    reason="Integration tests require AWS Bedrock credentials"
+)
 
 
 def normalize_output(output):

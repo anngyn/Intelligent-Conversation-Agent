@@ -1,9 +1,17 @@
 """RAG quality evaluation tests (groundedness and retrieval accuracy)."""
 
+import os
+
 import pytest
 
 from app.rag.retriever import FormattedRetriever
 from app.rag.store import load_vector_store
+
+# Skip tests requiring AWS Bedrock in CI
+pytestmark = pytest.mark.skipif(
+    os.getenv("CI") == "true",
+    reason="RAG quality tests require AWS Bedrock credentials"
+)
 
 # Golden dataset (hand-labeled test cases)
 EVAL_DATASET = [
