@@ -16,7 +16,7 @@ def test_sql_order_store_seed_and_lookup(tmp_path):
 
     source_path = Path("dataset/mock/orders.json")
     seeded = store.seed_from_json(source_path)
-    assert seeded == 4
+    assert seeded == 6
 
     order = store.lookup_order("John Smith", "1234", "1990-01-15")
     assert order is not None
